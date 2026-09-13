@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mana Regen Simulator - ArcheAge</title>
+
+  <style>
+    :root {
+      --bg-color: #1a1c23;
+      --card-bg: #242832;
+      --accent: #4f46e5;
+      --accent-hover: #4338ca;
+      --text: #e2e8f0;
+      --text-dim: #94a3b8;
+      --mana-color: #2563eb;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      max-width: 900px;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+
+    .full-width {
+      grid-column: 1 / -1;
+    }
+
+    h1, h2, h3 {
+      margin-top: 0;
+      color: #fff;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 0.9em;
+      color: var(--text-dim);
+    }
+
+    input[type="number"] {
+      width: 100%;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #374151;
+      background-color: #111827;
+      color: #fff;
+      font-size: 1rem;
+      box-sizing: border-box;
+      margin-bottom: 15px;
+    }
+
+    .mana-bar-container {
+      width: 100%;
+      background-color: #111827;
+      border-radius: 8px;
+      height: 28px;
+      overflow: hidden;
+      position: relative;
+      margin-top: 10px;
+      border: 1px solid #374151;
+    }
+
+    .mana-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #1d4ed8, #3b82f6);
+      width: 100%;
+      transition: width 0.1s linear;
+    }
+
+    .mana-bar-text {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 0.9rem;
+      text-shadow: 1px 1px 2px #000;
+    }
+
+    .skills-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+      margin-top: 15px;
+    }
+
+    .btn-skill {
+      background-color: #374151;
+      color: white;
+      border: 2px solid #4b5563;
+      padding: 12px 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+
+    .btn-skill:hover:not(:disabled) {
+      background-color: #4b5563;
+      border-color: #6b7280;
+    }
+
+    .btn-skill:active:not(:disabled) {
+      transform: scale(0.96);
+    }
+
+    .btn-skill:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .skill-name {
+      font-weight: bold;
+      font-size: 0.95rem;
+      margin-bottom: 4px;
+    }
+
+    .skill-cost {
+      font-size: 0.8rem;
+      color: #93c5fd;
+    }
+
+    .skill-cd {
+      font-size: 0.75rem;
+      color: #ef4444;
+      font-weight: bold;
+      margin-top: 2px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .btn-ctrl {
+      flex: 1;
+      padding: 10px;
+      border-radius: 6px;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+      background-color: var(--accent);
+      color: white;
+    }
+
+    .btn-ctrl:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .btn-danger {
+      background-color: #dc2626;
+    }
+
+    .btn-danger:hover {
+      background-color: #b91c1c;
+    }
+
+    .log-box {
+      background-color: #111827;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      height: 180px;
+      overflow-y: auto;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+
+    .log-entry {
+      margin-bottom: 4px;
+    }
+
+    .log-cast {
+      color: #f59e0b;
+    }
+
+    .log-regen {
+      color: #10b981;
+    }
+
+    .log-warn {
+      color: #ef4444;
+    }
+  </style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+  <!-- Configuration Panel -->
+
+  <div class="card">
+
+```
+<h2>Attributes & Regen</h2>
+
+<label for="spirit">Spirit</label>
+
+<input
+  type="number"
+  id="spirit"
+  value="1000"
+  min="0"
+  oninput="updateCalculations()"
+>
+
+<label for="postCastInput">
+  Post-Cast Mana Regen (per second)
+</label>
+
+<input
+  type="number"
+  id="postCastInput"
+  value="50"
+  min="0"
+  oninput="updateCalculations()"
+>
+
+<div style="background: #111827; padding: 12px; border-radius: 6px; font-size: 0.85rem; line-height: 1.5;">
+
+  <div>
+    <strong>Out-of-Combat Regen:</strong>
+    <span id="baseRegenVal" style="color:#10b981">0</span> /sec
+  </div>
+
+  <div>
+    <strong>Post-Cast Regen:</strong>
+    <span id="postCastVal" style="color:#3b82f6">0</span> /sec
+  </div>
+
+  <div>
+    <strong>Current State:</strong>
+    <span id="regenStateText" style="color:#60a5fa">Normal</span>
+  </div>
+
+  <div>
+    <strong>Time Since Last Cast:</strong>
+    <span id="outOfCombatTimer">5.0</span>s
+  </div>
+
+</div>
+```
+
+  </div>
+
+  <!-- Character Panel -->
+
+  <div class="card">
+
+```
+<h2>Healer Status</h2>
+
+<div class="mana-bar-container">
+
+  <div
+    id="manaFill"
+    class="mana-bar-fill">
+  </div>
+
+  <div
+    id="manaText"
+    class="mana-bar-text">
+    14000 / 14000
+  </div>
+
+</div>
+
+<div style="margin-top: 15px;">
+
+  <div>
+    <strong>Fervent Healing Debuff:</strong>
+    <span id="ferventDebuffText">Inactive</span>
+  </div>
+
+  <div>
+    <strong>Current Fervent Cost:</strong>
+    <span id="ferventCostText">155 Mana</span>
+  </div>
+
+</div>
+
+<div class="controls" style="margin-top: 20px;">
+
+  <button
+    id="btnPlay"
+    class="btn-ctrl"
+    onclick="togglePause()">
+    Pause
+  </button>
+
+  <button
+    class="btn-ctrl btn-danger"
+    onclick="resetSim()">
+    Reset
+  </button>
+
+</div>
+```
+
+  </div>
+
+  <!-- Skills Panel -->
+
+  <div class="card full-width">
+
+```
+<h2>Skills (Cast)</h2>
+
+<h3>Vitalism / Healer</h3>
+
+<div class="skills-grid">
+
+  <button
+    class="btn-skill"
+    id="btn-resurgence"
+    onclick="castSkill('resurgence')">
+
+    <span class="skill-name">Resurgence</span>
+    <span class="skill-cost">394 Mana</span>
+    <span class="skill-cd" id="cd-resurgence">No CD</span>
+
+  </button>
+
+
+  <button
+    class="btn-skill"
+    id="btn-fervent"
+    onclick="castSkill('fervent')">
+
+    <span class="skill-name">Fervent Healing</span>
+    <span class="skill-cost" id="btn-fervent-cost">155 Mana</span>
+    <span class="skill-cd" id="cd-fervent">No CD</span>
+
+  </button>
+
+</div>
+
+
+<h3 style="margin-top: 20px;">
+  Songcraft (3s Cooldown - Individual)
+</h3>
+
+<div class="skills-grid">
+
+  <button
+    class="btn-skill"
+    id="btn-chantey"
+    onclick="castSkill('chantey')">
+
+    <span class="skill-name">Chantey</span>
+    <span class="skill-cost">394 Mana</span>
+    <span class="skill-cd" id="cd-chantey">Ready</span>
+
+  </button>
+
+
+  <button
+    class="btn-skill"
+    id="btn-quickstep"
+    onclick="castSkill('quickstep')">
+
+    <span class="skill-name">Quickstep</span>
+    <span class="skill-cost">216 Mana</span>
+    <span class="skill-cd" id="cd-quickstep">Ready</span>
+
+  </button>
+
+
+  <button
+    class="btn-skill"
+    id="btn-hymn"
+    onclick="castSkill('hymn')">
+
+    <span class="skill-name">Healing Hymn</span>
+    <span class="skill-cost">858 Mana</span>
+    <span class="skill-cd" id="cd-hymn">Ready</span>
+
+  </button>
+
+
+  <button
+    class="btn-skill"
+    id="btn-ode"
+    onclick="castSkill('ode')">
+
+    <span class="skill-name">Ode to Joy</span>
+    <span class="skill-cost">433 Mana</span>
+    <span class="skill-cd" id="cd-ode">Ready</span>
+
+  </button>
+
+</div>
+```
+
+  </div>
+
+  <!-- Action Log -->
+
+  <div class="card full-width">
+
+```
+<h2>Action History</h2>
+
+<div
+  id="logBox"
+  class="log-box">
+</div>
+```
+
+  </div>
+
+</div>
+
+<script>
+
+  // ============================================================
+  // CONFIGURATION
+  // ============================================================
+
+  const MAX_MANA = 14000;
+
+  let currentMana = MAX_MANA;
+
+  let spirit = 1000;
+
+  let postCastRegen = 50;
+
+
+  // ============================================================
+  // SIMULATION STATE
+  // ============================================================
+
+  let timeSinceLastCast = 5.0;
+
+  let ferventStacks = 0;
+
+  let ferventTimer = 0;
+
+  let isPaused = false;
+
+
+  // ============================================================
+  // REAL-TIME CLOCK
+  // ============================================================
+
+  /*
+   * IMPORTANT:
+   *
+   * The simulation does NOT assume that the browser
+   * executes the loop at an exact interval.
+   *
+   * performance.now() measures the actual elapsed time.
+   */
+
+  let lastUpdateTime = performance.now();
+
+
+  // ============================================================
+  // COOLDOWNS
+  // ============================================================
+
+  const songcraftCDs = {
+    chantey: 0,
+    quickstep: 0,
+    hymn: 0,
+    ode: 0
+  };
+
+
+  // ============================================================
+  // SKILLS
+  // ============================================================
+
+  const skillsData = {
+
+    resurgence: {
+      name: 'Resurgence',
+      cost: 394
+    },
+
+    fervent: {
+      name: 'Fervent Healing',
+      baseCost: 155
+    },
+
+    chantey: {
+      name: 'Chantey',
+      cost: 394
+    },
+
+    quickstep: {
+      name: 'Quickstep',
+      cost: 216
+    },
+
+    hymn: {
+      name: 'Healing Hymn',
+      cost: 858
+    },
+
+    ode: {
+      name: 'Ode to Joy',
+      cost: 433
+    }
+
+  };
+
+
+  // ============================================================
+  // CALCULATIONS
+  // ============================================================
+
+  function updateCalculations() {
+
+    spirit =
+      parseFloat(
+        document.getElementById('spirit').value
+      ) || 0;
+
+    postCastRegen =
+      parseFloat(
+        document.getElementById('postCastInput').value
+      ) || 0;
+
+
+    const baseRegen =
+      (spirit * 0.2) + 15;
+
+
+    document.getElementById('baseRegenVal')
+      .innerText = baseRegen.toFixed(1);
+
+
+    document.getElementById('postCastVal')
+      .innerText = postCastRegen.toFixed(1);
+
+  }
+
+
+  // ============================================================
+  // LOG
+  // ============================================================
+
+  function log(msg, type = '') {
+
+    const logBox =
+      document.getElementById('logBox');
+
+    const entry =
+      document.createElement('div');
+
+    entry.className =
+      `log-entry ${type}`;
+
+
+    const now = new Date();
+
+    const timeStr =
+      `${String(now.getMinutes()).padStart(2, '0')}:` +
+      `${String(now.getSeconds()).padStart(2, '0')}`;
+
+
+    entry.innerText =
+      `[${timeStr}] ${msg}`;
+
+
+    logBox.prepend(entry);
+
+  }
+
+
+  // ============================================================
+  // CAST SKILL
+  // ============================================================
+
+  function castSkill(skillKey) {
+
+    let cost = 0;
+
+
+    // Calculate Fervent Healing cost
+    if (skillKey === 'fervent') {
+
+      cost =
+        155 * Math.pow(1.5, ferventStacks);
+
+    }
+
+    else {
+
+      cost =
+        skillsData[skillKey].cost;
+
+    }
+
+
+    // Check mana
+    if (currentMana < cost) {
+
+      log(
+        `Not enough mana to cast ${skillsData[skillKey].name}! ` +
+        `(${Math.round(cost)} required)`,
+        'log-warn'
+      );
+
+      return;
+    }
+
+
+    // Check Songcraft cooldown
+    if (
+      ['chantey', 'quickstep', 'hymn', 'ode']
+        .includes(skillKey)
+    ) {
+
+      if (songcraftCDs[skillKey] > 0) {
+        return;
+      }
+
+      songcraftCDs[skillKey] = 3.0;
+
+    }
+
+
+    // Consume mana
+    currentMana -= cost;
+
+
+    // Reset the 5-second timer
+    timeSinceLastCast = 0;
+
+
+    // Fervent Healing
+    if (skillKey === 'fervent') {
+
+      ferventStacks++;
+
+      ferventTimer = 10.0;
+
+    }
+
+
+    log(
+      `Cast ${skillsData[skillKey].name} ` +
+      `for ${Math.round(cost)} Mana.`,
+      'log-cast'
+    );
+
+
+    updateUI();
+
+  }
+
+
+  // ============================================================
+  // MAIN SIMULATION LOOP
+  // ============================================================
+
+  function gameLoop() {
+
+    const now = performance.now();
+
+
+    /*
+     * Calculate the EXACT amount of real time that
+     * has passed since the previous update.
+     */
+
+    let deltaTime =
+      (now - lastUpdateTime) / 1000;
+
+
+    lastUpdateTime = now;
+
+
+    /*
+     * Prevent huge time jumps if the browser tab was
+     * inactive, the computer went to sleep, etc.
+     */
+
+    if (deltaTime > 1) {
+      deltaTime = 1;
+    }
+
+
+    // If paused, do not advance the simulation
+    if (isPaused) {
+
+      requestAnimationFrame(gameLoop);
+
+      return;
+
+    }
+
+
+    // ========================================================
+    // TIME SINCE LAST CAST
+    // ========================================================
+
+    timeSinceLastCast += deltaTime;
+
+
+    // ========================================================
+    // MANA REGENERATION
+    // ========================================================
+
+    const baseRegen =
+      (spirit * 0.2) + 15;
+
+
+    /*
+     * Mana per second × actual elapsed time.
+     *
+     * Example:
+     *
+     * 50 Mana/sec for 1 real second = 50 Mana
+     */
+
+    let regenPerSecond =
+      postCastRegen;
+
+
+    if (timeSinceLastCast >= 5.0) {
+
+      regenPerSecond += baseRegen;
+
+    }
+
+
+    const manaRegen =
+      regenPerSecond * deltaTime;
+
+
+    if (currentMana < MAX_MANA) {
+
+      currentMana =
+        Math.min(
+          MAX_MANA,
+          currentMana + manaRegen
+        );
+
+    }
+
+
+    // ========================================================
+    // FERVENT HEALING DEBUFF
+    // ========================================================
+
+    if (ferventStacks > 0) {
+
+      ferventTimer -= deltaTime;
+
+
+      if (ferventTimer <= 0) {
+
+        ferventStacks = 0;
+
+        ferventTimer = 0;
+
+
+        log(
+          'Fervent Healing debuff expired. ' +
+          'Cost returned to normal.',
+          'log-regen'
+        );
+
+      }
+
+    }
+
+
+    // ========================================================
+    // COOLDOWNS
+    // ========================================================
+
+    for (const key in songcraftCDs) {
+
+      if (songcraftCDs[key] > 0) {
+
+        songcraftCDs[key] =
+          Math.max(
+            0,
+            songcraftCDs[key] - deltaTime
+          );
+
+      }
+
+    }
+
+
+    // Update interface
+    updateUI();
+
+
+    // Continue loop
+    requestAnimationFrame(gameLoop);
+
+  }
+
+
+  // ============================================================
+  // USER INTERFACE
+  // ============================================================
+
+  function updateUI() {
+
+    // ----------------------------------------------------------
+    // Mana
+    // ----------------------------------------------------------
+
+    const percent =
+      (currentMana / MAX_MANA) * 100;
+
+
+    document.getElementById('manaFill')
+      .style.width = `${percent}%`;
+
+
+    document.getElementById('manaText')
+      .innerText =
+      `${Math.round(currentMana)} / ${MAX_MANA}`;
+
+
+    // ----------------------------------------------------------
+    // Regen State
+    // ----------------------------------------------------------
+
+    const stateText =
+      document.getElementById('regenStateText');
+
+    const timerText =
+      document.getElementById('outOfCombatTimer');
+
+
+    if (timeSinceLastCast >= 5.0) {
+
+      stateText.innerText =
+        'Full Regen (Base + Post-Cast)';
+
+      stateText.style.color =
+        '#34d399';
+
+      timerText.innerText =
+        'Active (5.0s+)';
+
+    }
+
+    else {
+
+      stateText.innerText =
+        'Post-Cast Only (In Combat)';
+
+      stateText.style.color =
+        '#f59e0b';
+
+      timerText.innerText =
+        `${timeSinceLastCast.toFixed(1)}s / 5.0s`;
+
+    }
+
+
+    // ----------------------------------------------------------
+    // Fervent Healing
+    // ----------------------------------------------------------
+
+    const ferventCost =
+      155 * Math.pow(1.5, ferventStacks);
+
+
+    document.getElementById('ferventCostText')
+      .innerText =
+      `${Math.round(ferventCost)} Mana`;
+
+
+    document.getElementById('btn-fervent-cost')
+      .innerText =
+      `${Math.round(ferventCost)} Mana`;
+
+
+    const debuffText =
+      document.getElementById('ferventDebuffText');
+
+
+    if (ferventStacks > 0) {
+
+      debuffText.innerText =
+        `+${(
+          Math.pow(1.5, ferventStacks) * 100 - 100
+        ).toFixed(0)}% consumption ` +
+        `(${Math.max(0, ferventTimer).toFixed(1)}s remaining)`;
+
+
+      debuffText.style.color =
+        '#ef4444';
+
+    }
+
+    else {
+
+      debuffText.innerText =
+        'Inactive';
+
+      debuffText.style.color =
+        '#94a3b8';
+
+    }
+
+
+    // ----------------------------------------------------------
+    // Cooldowns
+    // ----------------------------------------------------------
+
+    [
+      'chantey',
+      'quickstep',
+      'hymn',
+      'ode'
+    ].forEach(skill => {
+
+      const btn =
+        document.getElementById(`btn-${skill}`);
+
+      const cdSpan =
+        document.getElementById(`cd-${skill}`);
+
+      const cdLeft =
+        songcraftCDs[skill];
+
+
+      if (cdLeft > 0) {
+
+        btn.disabled = true;
+
+        cdSpan.innerText =
+          `${cdLeft.toFixed(1)}s`;
+
+      }
+
+      else {
+
+        btn.disabled = false;
+
+        cdSpan.innerText =
+          'Ready';
+
+      }
+
+    });
+
+  }
+
+
+  // ============================================================
+  // PAUSE / RESUME
+  // ============================================================
+
+  function togglePause() {
+
+    isPaused = !isPaused;
+
+
+    document.getElementById('btnPlay')
+      .innerText =
+      isPaused ? 'Resume' : 'Pause';
+
+
+    /*
+     * Reset the clock reference so the time spent
+     * paused is NOT counted by the simulation.
+     */
+
+    lastUpdateTime =
+      performance.now();
+
+  }
+
+
+  // ============================================================
+  // RESET
+  // ============================================================
+
+  function resetSim() {
+
+    currentMana =
+      MAX_MANA;
+
+
+    timeSinceLastCast =
+      5.0;
+
+
+    ferventStacks =
+      0;
+
+
+    ferventTimer =
+      0;
+
+
+    for (const key in songcraftCDs) {
+
+      songcraftCDs[key] =
+        0;
+
+    }
+
+
+    isPaused = false;
+
+
+    document.getElementById('btnPlay')
+      .innerText = 'Pause';
+
+
+    document.getElementById('logBox')
+      .innerHTML = '';
+
+
+    lastUpdateTime =
+      performance.now();
+
+
+    log('Simulation reset.');
+
+
+    updateUI();
+
+  }
+
+
+  // ============================================================
+  // INITIALIZATION
+  // ============================================================
+
+  updateCalculations();
+
+  updateUI();
+
+  lastUpdateTime =
+    performance.now();
+
+
+  // Start simulation
+  requestAnimationFrame(gameLoop);
+
+</script>
+
+</body>
+</html>
